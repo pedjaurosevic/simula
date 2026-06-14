@@ -1,0 +1,25 @@
+title: simula
+description: A local-first engine for generating and inhabiting worlds and personas from your own materials.
+remote_theme: just-the-docs/just-the-docs
+
+url: https://pedjaurosevic.github.io
+baseurl: /simula
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+
+# just-the-docs settings
+search_enabled: true
+heading_anchors: true
+color_scheme: dark
+
+aux_links:
+  "simula on GitHub":
+    - "https://github.com/pedjaurosevic/simula"
+  "simula on PyPI":
+    - "https://pypi.org/project/simula/"
+
+aux_links_new_tab: true
+
+footer_content: "MIT licensed. Built local-first."

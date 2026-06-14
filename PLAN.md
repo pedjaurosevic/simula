@@ -1,269 +1,275 @@
-# simulacra — PLAN
+# simula — PLAN
 
-> Lokalno-prvi pogon za generisanje i naseljavanje sazdanih svetova i persona iz
-> korisnikovih materijala. Jedan engine, dva tipa blueprinta, jedinstven model entiteta.
-> Ime nosi pitanje, ne tvrdnju: da li je sazdani um/svet stvaran? (PKD)
+> A local-first engine for generating and inhabiting fashioned worlds and personas from the
+> user's own materials. One engine, two blueprint types, one unified entity model.
+> The name carries a question, not a claim: is a fashioned mind/world real? (PKD)
 
-Ovaj dokument je interni plan. Javni README ide na engleski kasnije; ovde mislimo na srpskom.
-Kod, šeme i config su na engleskom (prenosivost, GitHub).
-
----
-
-## 0. Šta simulacra jeste (i šta NIJE)
-
-**Jeste:** tanak harness koji (1) primi korisnikove materijale (knjige, tekstove), (2) iz njih
-destiluje *blueprint* (kičmu sveta ili persone — uglavnom pokazivače u materijal + sićušan
-sažetak), i (3) vodi interaktivno, stateful, memorijsko iskustvo u kome LLM **predlaže**
-strukturisane promene, a engine **drži istinu**.
-
-**Nije:** generator svetova „iz vazduha", elaborirana kognitivna arhitektura, ni fork Zorka.
-Zork je fiksni autorisani svet; mi pravimo svet *iz korpusa*. (Vidi `PRINCIPLES.md` za zašto —
-to su pouke iz naše serije eksperimenata, ne stil.)
-
-Dve implementacije nad istim jezgrom:
-- **simulacra worldbuilding** — TUI/web igra; korisnik prolazi kroz svet generisan iz njegovih
-  knjiga. Osnovana ideja, gradimo je prvu.
-- **simulacra persona** — isti koncept primenjen na stvaranje persone (Big Five / OCEAN supstrat
-  preko IPIP-a, javni domen × korisnikov materijal). Druga faza.
-
-I key ideja: persona stvorena u *persona* modu može da živi u svetu iz *worldbuilding* moda.
-To NIJE dodatak — to je ono za šta jedinstven model entiteta i postoji (sekcija 4).
+This document is the design plan. Code, schemas, and config are all in English (portability, GitHub).
 
 ---
 
-## 1. Jedinstven model entiteta — srce dizajna
+## 0. What simula is (and is NOT)
 
-Sve u simulacri je **simulakrum**:
+**It is:** a thin harness that (1) takes the user's materials (books, texts), (2) distills a
+*blueprint* from them (the spine of a world or a persona — mostly pointers into the material plus a
+tiny summary), and (3) runs an interactive, stateful, memory-bearing experience in which the LLM
+**proposes** structured changes while the engine **holds the truth**.
+
+**It is NOT:** a world generator "out of thin air," an elaborate cognitive architecture, or a Zork
+fork. Zork is a fixed authored world; we build a world *from a corpus*. (See `PRINCIPLES.md` for
+why — these are lessons from our experiment series, not style.)
+
+Two implementations over the same core:
+- **simula worldbuilding** — a TUI/web game; the user walks through a world generated from their
+  books. The founding idea; we build it first.
+- **simula persona** — the same concept applied to creating a persona (Big Five / OCEAN substrate
+  via IPIP, public domain × the user's material). Second phase.
+
+A key idea: a persona created in *persona* mode can live inside a world from *worldbuilding* mode.
+This is NOT an add-on — it is exactly what the unified entity model exists for (section 4).
+
+---
+
+## 1. The unified entity model — the heart of the design
+
+Everything in simula is a **simulacrum**:
 
 ```
-Simulakrum = (Blueprint, State, Memory, Contract)
+Simulacrum = (Blueprint, State, Memory, Contract)
 ```
 
-- **Blueprint** — destilovana kičma: ŠTA je entitet. Uglavnom pokazivači u materijale + kratak
-  sažetak. NE velika ontologija (pouka B'=B: ontologija je dekoracija; grounding na tekst nosi
-  posledicu).
-- **State** — deterministički izvor istine koji drži *engine*, ne model.
-- **Memory** — kratkoročno (prozor transkripta) + dugoročno (ledger činjenica, istorija) +
-  pretraga (RAG) nad oboje. Ovo je „pamti".
-- **Contract** — gramatika/šema koju LLM MORA da emituje da bi predložio deltu (naracija + promena
-  stanja). Struktura na granici, slobodno rezonovanje unutra.
+- **Blueprint** — the distilled spine: WHAT the entity is. Mostly pointers into materials plus a
+  short summary. NOT a large ontology (the B'=B lesson: ontology is decoration; grounding on the
+  text carries the consequence).
+- **State** — the deterministic source of truth held by the *engine*, not the model.
+- **Memory** — short-term (transcript window) + long-term (fact ledger, history) + search (RAG)
+  over both. This is the "remember."
+- **Contract** — the grammar/schema the LLM MUST emit to propose a delta (narration + state change).
+  Structure at the boundary, free reasoning inside.
 
-Iz ovoga sve sledi:
-- **Svet** = simulakrum čije je stanje *okruženje* (mesta, predmeti, NPC-ovi, vreme), a petlja je
-  istraživanje.
-- **Persona** = simulakrum čije je stanje *agent* (raspoloženje, znanje, odnos, ciljevi), a petlja
-  je razgovor.
-- **NPC** = persona-simulakrum *ugnežden* u svet-simulakrum. Kad igrač priča s njim, svetska petlja
-  delegira potez tog entiteta persona-petlji, pa rezultat vrati kao svetsku deltu.
+Everything follows from this:
+- **World** = a simulacrum whose state is the *environment* (places, objects, NPCs, time), and the
+  loop is exploration.
+- **Persona** = a simulacrum whose state is the *agent* (mood, knowledge, relationship, goals), and
+  the loop is conversation.
+- **NPC** = a persona-simulacrum *embedded* in a world-simulacrum. When the player talks to it, the
+  world loop delegates that entity's turn to the persona loop, then returns the result as a world
+  delta.
 
-Zato je persona-u-svetu **kompozicija simulakruma**, a ne nova mašinerija. Gradiš jednu apstrakciju
-entiteta i dve šeme blueprinta; ukrštanje je besplatno (ali se *isporučuje* poslednje — sekcija 4).
+That is why persona-in-world is a **composition of simulacra**, not new machinery. You build one
+entity abstraction and two blueprint schemas; the crossover is free (but *ships* last — section 4).
 
 ---
 
-## 2. Slojevi
+## 2. Layers
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Klijenti (tanki):  TUI (Textual)   |   Web UI (FastAPI) │
+│  Clients (thin):  TUI (Textual)   |   Web UI (FastAPI)   │
 ├─────────────────────────────────────────────────────────┤
-│  simulacra-core (biblioteka)                             │
-│   • Backend apstrakcija (llama.cpp lokalno | OpenAI-compat)│
-│   • Constrained output (GBNF lokalno | json_schema/tools) │
+│  simula-core (library)                                   │
+│   • Backend abstraction (llama.cpp local | OpenAI-compat)│
+│   • Constrained output (GBNF local | json_schema/tools)  │
 │   • RAG (sqlite-vec + FTS5, e5-small embeddings)         │
-│   • State engine (sqlite, izvor istine) + Fact ledger    │
-│   • Memory (kratko/dugoročno + pretraga)                 │
+│   • State engine (sqlite, source of truth) + Fact ledger │
+│   • Memory (short/long-term + search)                    │
 │   • Turn loop (ORORO-minimal)                            │
 │   • Eval rig (style-fidelity, drift, commit-rate)        │
 ├─────────────────────────────────────────────────────────┤
-│  Blueprint sloj:  World blueprint  |  Persona blueprint  │
+│  Blueprint layer:  World blueprint  |  Persona blueprint │
 ├─────────────────────────────────────────────────────────┤
-│  Workspace:  ~/simulacra-workspace/  (sqlite, materijali) │
+│  Workspace:  ~/simula-workspace/  (sqlite, materials)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-Klijenti su tanki — sva logika je u `simulacra-core`. TUI i web su dve kože nad istim jezgrom.
+Clients are thin — all logic is in `simula-core`. TUI and web are two skins over the same core.
 
 ---
 
 ## 3. Turn loop (ORORO-minimal)
 
-Jedan potez, isti za svet i personu (razlika je samo u blueprintu i šemi delte):
+One turn, identical for world and persona (the difference is only the blueprint and the delta
+schema):
 
-1. **Observe** — primi korisnikov unos.
-2. **Retrieve** — RAG dohvati relevantne odlomke iz materijala + relevantne činjenice iz ledgera
-   (grounding protiv *narativnog* drifta, ne samo knjigovodstvenog).
-3. **React** — sastavi MINIMALAN prompt: commit-direktiva + blueprint-kičma + dohvaćeni egzemplari
-   + trenutno stanje + prozor transkripta + korisnikov unos.
-4. **Constrain** — pozovi backend sa contract-om (GBNF lokalno / json_schema na OpenAI-compat).
-   Izlaz = `{ narration, deltas[] }`, garantovano parsabilno.
-5. **Validate & apply** — engine proveri delte protiv stanja i ledgera (odbij nevalidne — npr.
-   uzmi predmet koji nije tu), primeni validne, upiši u ledger.
-6. **Persist & render** — sačuvaj stanje, prikaži naraciju.
+1. **Observe** — take the user's input.
+2. **Retrieve** — RAG fetches relevant passages from the materials + relevant facts from the ledger
+   (grounding against *narrative* drift, not just bookkeeping drift).
+3. **React** — assemble a MINIMAL prompt: commit directive + blueprint spine + retrieved exemplars
+   + current state + transcript window + user input.
+4. **Constrain** — call the backend with a contract (GBNF locally / json_schema on OpenAI-compat).
+   Output = `{ narration, deltas[] }`, guaranteed parsable.
+5. **Validate & apply** — the engine checks deltas against state and the ledger (reject invalid ones
+   — e.g., taking an object that isn't there), applies the valid ones, writes to the ledger.
+6. **Persist & render** — save state, render the narration.
 
-Commit-direktiva je najvredniji deo prompta (pouka iz testova: failure mode modela je ograđivanje
-→ generička kaša). Sadržaj otprilike: *„Obaveži se na konkretan, opipljiv detalj ukorenjen u
-teksturi ovog sveta/persone. Nikad ne uzmiči u generičku fantastiku ili neodređenost."*
-
----
-
-## 4. Persona-u-svetu — moje mišljenje
-
-Ideja je dobra i nije periferna: ona je *razlog* da model entiteta bude jedinstven. Ako su i svet i
-persona „simulakrum = (blueprint, state, memory, contract)", onda je persona u svetu samo bogat NPC
-— svetska petlja delegira njegov potez persona-petlji. Apstrakcija to dopušta od prvog dana, pa
-treba da je projektujemo *unutra* odmah (uniformni entiteti), čak i pre nego što je iskoristimo.
-
-Ali iskreno o ceni, da je ne gradimo prerano:
-- Dva LLM-vođena entiteta sa svojim stanjem znače *dva* poziva po potezu (latencija) i
-  *umnožen* rizik drifta — persona mora ostati dosledna sebi I uklopiti se u ton sveta.
-- To je najteži slučaj koherencije. Pouka „meri gde pada": ne gradi najteže prvo.
-
-Zato: **arhitektura to dozvoljava od starta, ali se isporučuje poslednje** (Faza 6), tek kad eval
-rig pokaže da je drift *jednog* entiteta pod kontrolom. Voli ideju, odloži izvođenje.
+The commit directive is the most valuable part of the prompt (lesson from the tests: the model's
+failure mode is hedging → generic mush). Roughly: *"Commit to a concrete, tangible detail rooted in
+the texture of this world/persona. Never retreat into generic fantasy or vagueness."*
 
 ---
 
-## 5. Backend apstrakcija (lokalno-prvi, ali uvek OpenAI-compat)
+## 4. Persona-in-world — my view
 
-Jedan interfejs, dva adaptera (vidi `simulacra/backends.py`):
+The idea is good and not peripheral: it is the *reason* the entity model is unified. If both world
+and persona are "simulacrum = (blueprint, state, memory, contract)," then a persona in a world is
+just a rich NPC — the world loop delegates its turn to the persona loop. The abstraction allows it
+from day one, so we should design it *in* immediately (uniform entities), even before we use it.
+
+But honestly about the cost, so we don't build it too early:
+- Two LLM-driven entities, each with their own state, mean *two* calls per turn (latency) and
+  *multiplied* drift risk — the persona must stay true to itself AND fit the world's tone.
+- That is the hardest coherence case. The "measure where it fails" lesson: don't build the hardest
+  thing first.
+
+So: **the architecture allows it from the start, but it ships last** (Phase 6), only once the eval
+rig shows that the drift of a *single* entity is under control. Love the idea, defer the execution.
+
+---
+
+## 5. Backend abstraction (local-first, but always OpenAI-compat)
+
+One interface, two adapters (see `simula/backends.py`):
 
 ```
 complete(messages, *, contract=None, temperature, max_tokens) -> str
 ```
 
-- **LlamaCppBackend** (primarno): HTTP na lokalni server (:18083). Constrained output preko
-  **GBNF gramatike** (`grammar` polje) — garancija validnog JSON-a na nivou dekodiranja. Embeddings
-  lokalno (e5-small). Ovo je default.
-- **OpenAICompatBackend**: bilo koji OpenAI-kompatibilan endpoint + ključ + model. Constrained
-  output preko `response_format: json_schema` ili tool-calling; fallback parse-and-repair petlja
-  ako model ne podržava. Embeddings: ili njihov endpoint ili i dalje lokalni e5 (preporuka: lokalni
-  e5, da se ne vezujemo).
+- **LlamaCppBackend** (primary): HTTP to a local server (:18083). Constrained output via a
+  **GBNF grammar** (the `grammar` field) — a guarantee of valid JSON at decode time. Embeddings
+  local (e5-small). This is the default.
+- **OpenAICompatBackend**: any OpenAI-compatible endpoint + key + model. Constrained output via
+  `response_format: json_schema` or tool-calling; a parse-and-repair fallback loop if the model
+  doesn't support it. Embeddings: either their endpoint or still local e5 (recommended: local e5,
+  to avoid coupling).
 
-Izbor backenda je u `simulacra.toml` u workspace-u. „Contract" je apstrakcija strukturisanog
-izlaza koja se različito implementira po backendu — to je kičma pouzdanosti.
+The backend choice lives in `simula.toml` in the workspace. The "Contract" is the structured-output
+abstraction implemented differently per backend — it is the reliability backbone.
 
 ---
 
-## 6. Workspace (instalira se na korisnikovoj mašini)
+## 6. Workspace (installed on the user's machine)
 
-Lokacija preko `platformdirs` (cross-platform), default `~/simulacra-workspace/`:
+Location via `platformdirs` (cross-platform), default `~/simula-workspace/`:
 
 ```
-simulacra-workspace/
-  simulacra.toml          # config: backend, endpoint, model, ključ, mod iskustva
-  materials/              # korisnikove knjige/tekstovi (njegovi, lokalno)
+simula-workspace/
+  simula.toml             # config: backend, endpoint, model, key, experience mode
+  materials/              # the user's books/texts (theirs, local)
   library.sqlite          # RAG (sqlite-vec + FTS5) + state + memory + ledger
-  blueprints/             # destilovani world/persona blueprintovi (JSON)
-  saves/                  # snimci iskustva / transkripti
-  evals/                  # rezultati eval rig-a
+  blueprints/             # distilled world/persona blueprints (JSON)
+  saves/                  # experience snapshots / transcripts
+  evals/                  # eval rig results
 ```
 
-Korisnik ubacuje knjige kroz TUI ili web (koji ih kopira u `materials/` i pokrene ingest). Sve je
-inspektabilno i prenosivo. **Ne isporučujemo korpus** — korisnik donosi svoj (sekcija 9).
+The user adds books through the TUI or web (which copies them into `materials/` and runs the
+ingest). Everything is inspectable and portable. **We do not ship a corpus** — the user brings
+their own (section 9).
 
 ---
 
 ## 7. Cross-platform
 
-Jezgro je Python (Linux/Mac/Windows). Pravila:
-- Bez Linux-only zavisnosti; `pathlib` svuda, nikakve bash pretpostavke u jezgru.
-- TUI: **Textual** (moderan, cross-platform). Web: **FastAPI** + tanak frontend.
-- sqlite-vec radi cross-platform; e5-small preko `sentence-transformers`/`llama.cpp` embeddinga.
-- llama.cpp backend je samo HTTP ka serveru koji korisnik diže (ili koristi OpenAI-compat),
-  pa jezgro ne zavisi od platforme servera.
-- Workspace lokacije preko `platformdirs`.
+The core is Python (Linux/Mac/Windows). Rules:
+- No Linux-only dependencies; `pathlib` everywhere, no bash assumptions in the core.
+- TUI: **Textual** (modern, cross-platform). Web: **FastAPI** + a thin frontend.
+- sqlite-vec works cross-platform; e5-small via `sentence-transformers`/`llama.cpp` embeddings.
+- The llama.cpp backend is just HTTP to a server the user runs (or uses OpenAI-compat), so the core
+  doesn't depend on the server's platform.
+- Workspace locations via `platformdirs`.
 
-Razvijaš na Linux Mint; CI testira i Win/Mac (matrica) pre svakog release-a.
-
----
-
-## 8. Pouzdanost: protiv drifta
-
-Dva nivoa drifta, dva leka:
-- **Knjigovodstveni** (inventar, lokacija): state izvan modela + constrained delte + validacija u
-  engine-u. Model predlaže, engine presuđuje.
-- **Narativni/tonski/činjenični** (zaboravi ustanovljenu činjenicu, izneveri ton, protivreči se):
-  RAG-grounding na materijale svakog poteza + **fact ledger** (tekući zapis ustanovljenih
-  činjenica) koji se i dohvata i koristi za validaciju kontradikcija.
-
-Drugi nivo je pravi teški problem (pouka „meri gde pada"). Inženjerska vrednost simulacre je tu, ne
-u lepoti jednog poteza.
+You develop on Linux Mint; CI tests Win/Mac too (a matrix) before every release.
 
 ---
 
-## 9. Copyright / IP (bitno za javni GitHub)
+## 8. Reliability: against drift
 
-- Isporučuje se **engine, nikad korpus**. Korisnik donosi svoje knjige u `materials/`.
-- Blueprint vadi *teksturu* (ton, motivi, struktura, leksikon kao pokazivače), ne reprodukuje
-  tekst. Dodaj guard protiv dugih doslovnih pasusa u naraciji.
-- Rezultat: svet *u teksturi* nekog autora, ne prepis. Pravna higijena i bolja umetnost.
+Two levels of drift, two cures:
+- **Bookkeeping** (inventory, location): state outside the model + constrained deltas + validation
+  in the engine. The model proposes, the engine adjudicates.
+- **Narrative/tonal/factual** (forgets an established fact, betrays the tone, contradicts itself):
+  RAG grounding on the materials every turn + a **fact ledger** (a running record of established
+  facts) that is both retrieved and used to validate contradictions.
 
----
-
-## 10. Eval rig — kičma, ne naknadna misao
-
-Prenamenjuje naš aparat iz serije testova (uslovi, ablacija, pre-registracija). Meri:
-- **style-fidelity** — embedding-distanca izlaza do korpusa (da li zvuči kao svet/persona).
-- **drift** — broj kontradikcija izlaza protiv fact ledgera kroz N poteza.
-- **commit-rate** — udeo poteza sa konkretnim, ukotvljenim detaljem vs generička kaša
-  (anti-mush; meri da li commit-direktiva radi).
-
-Svaka izmena prompta/RAG-a/backenda prolazi brzu ablaciju pre usvajanja. Svaka faza ima eval-kapiju.
+The second level is the real hard problem (the "measure where it fails" lesson). simula's
+engineering value lives there, not in the beauty of a single turn.
 
 ---
 
-## 11. Persona blueprint — Big Five / OCEAN preko IPIP-a (a NE MBTI/16Personalities)
+## 9. Copyright / IP (important for a public GitHub)
 
-Supstrat persone je **Big Five / OCEAN**, instanciran preko **IPIP** stavki — koje su u
-**javnom domenu** (https://ipip.ori.org), slobodne za kopiranje, izmenu, prevod i komercijalnu
-upotrebu, bez dozvole i naknade. To je svestan izbor i pravni i naučni:
-
-- **Pravno (bitno za javni GitHub release):** MBTI je žig firme Myers-Briggs i licenciran
-  instrument; 16Personalities NIJE MBTI nego NERIS okvir sa sopstvenim brendom, opisima, imenima
-  arhetipova („Advocate" itd.) i grafikom — sve njihova svojina. Ne reprodukujemo njihov tekst,
-  imena tipova ni brend. Sama tipologija (ideja osa, četvoroslovne oznake) nije pod copyrightom,
-  ali pošto isporučujemo javni, komercijalno upotrebljiv engine, ne oslanjamo se na „hobi/lično"
-  izuzetak — biramo čist javni-domen supstrat. (Ovo nije pravni savet; specifike variraju
-  Srbija/EU vs SAD korisnici repa.)
-- **Naučno:** OCEAN je empirijski robustan i falsifikabilan, za razliku od MBTI dihotomija. To se
-  poklapa sa etosom serije testova (PRINCIPLES.md): merljivo i pošteno, ne klinička tvrdnja.
-
-Mapiranje: pet **kontinuiranih** osa (O, C, E, A, N u [0,1]) → tendencije ponašanja, registar/glas
-(iz materijala ako je persona „po" korpusu), vrednosti, manir, sopstvena „istorija" u memoriji.
-Ako za generativnu udobnost zatreba diskretan seme, kontinuirane skorove **bukujemo u sopstvene
-arhetipove sa sopstvenim imenima i opisima** (`archetype` polje, opciono) — nikad tuđa imena ni
-tekst. Vidi `schemas/persona_blueprint.schema.json` (`ocean` umesto stare `lattice`).
+- We ship the **engine, never the corpus**. The user brings their own books into `materials/`.
+- The blueprint extracts *texture* (tone, motifs, structure, lexicon as pointers), it does not
+  reproduce text. Add a guard against long verbatim passages in the narration.
+- Result: a world *in the texture* of some author, not a transcript. Legal hygiene and better art.
 
 ---
 
-## 12. Faze gradnje (svaka sa eval-kapijom)
+## 10. Eval rig — the backbone, not an afterthought
 
-- **Faza 0 — skelet.** Workspace bootstrap, config, backend adapter (llama.cpp + openai), contract
-  apstrakcija, „hello world" turn loop end-to-end na *praznom* sadržaju. (Prvo radi end-to-end na
-  praznom, pa dodaj komade.)
-- **Faza 1 — ingest + RAG.** Ubaci knjige → chunk → embed → retrieve. Kapija: relevantnost
-  dohvata na ručnim upitima.
-- **Faza 2 — worldbuilding (osnovana ideja).** World DISTILL (korpus → world blueprint) +
-  worldbuilding PLAY loop + STATE + fact ledger. TUI klijent. Prvi igrivi svet: **Kipple** (PKD).
-- **Faza 3 — eval rig.** style-fidelity, drift, commit-rate; ablatiraj izbore prompta/RAG-a.
-  Kapija: drift pod kontrolom kroz dugu sesiju.
-- **Faza 4 — persona.** Persona DISTILL (OCEAN/IPIP supstrat × materijal → persona blueprint) + persona
-  PLAY loop (razgovor, doslednost).
-- **Faza 5 — web UI.** Tanak klijent nad jezgrom (FastAPI). Ubacivanje knjiga kroz web.
-- **Faza 6 — persona-u-svetu.** Uniformni model entiteta se isplati: persona kao bogat NPC.
-  Tek kad Faza 3 pokaže kontrolisan drift jednog entiteta.
+Repurposes our apparatus from the test series (conditions, ablation, pre-registration). It measures:
+- **style-fidelity** — embedding distance of the output to the corpus (does it sound like the
+  world/persona).
+- **drift** — the number of contradictions of the output against the fact ledger across N turns.
+- **commit-rate** — the fraction of turns with a concrete, anchored detail vs generic mush
+  (anti-mush; measures whether the commit directive works).
 
-Pravilo kroz sve faze: dodaj komponentu samo kad ablacija pokaže deltu ili spreči regresiju.
-Najtanji harness koji radi, pa rast po dokazu — inverzija „970/1000 bogatstva mašinerije".
+Every prompt/RAG/backend change passes a fast ablation before adoption. Every phase has an eval gate.
 
 ---
 
-## 13. Eksplicitni ne-ciljevi (anti-inflacija)
+## 11. Persona blueprint — Big Five / OCEAN via IPIP (and NOT MBTI/16Personalities)
 
-- Bez velike svetske ontologije u promptu (pokazivači + kičma umesto toga).
-- Bez krutih višekoračnih reasoning-šablona u sistem-promptu (krutost škodi — vidi dim_masina
-  u `PRINCIPLES.md`).
-- Bez self-modifying „super-exo" sloja u v1 (defeasible heuristike kasnije, ako ablacija traži).
-- Bez LangChain-a i teških apstrakcija — direktni pozivi.
-- Bez forka Z-machine/Zorka — pogrešan temelj za korpus→svet.
+The persona substrate is **Big Five / OCEAN**, instantiated via **IPIP** items — which are in the
+**public domain** (https://ipip.ori.org), free to copy, modify, translate, and use commercially,
+without permission or fee. This is a deliberate choice, both legal and scientific:
+
+- **Legally (important for a public GitHub release):** MBTI is a trademark of the Myers-Briggs
+  company and a licensed instrument; 16Personalities is NOT MBTI but the NERIS framework with its
+  own brand, descriptions, archetype names ("Advocate," etc.), and graphics — all their property.
+  We do not reproduce their text, type names, or brand. The typology itself (the idea of axes,
+  four-letter labels) is not copyrightable, but because we ship a public, commercially usable
+  engine, we do not rely on a "hobby/personal" exception — we choose a clean public-domain
+  substrate. (This is not legal advice; specifics vary for Serbia/EU vs US users of the repo.)
+- **Scientifically:** OCEAN is empirically robust and falsifiable, unlike MBTI dichotomies. That
+  matches the ethos of the test series (PRINCIPLES.md): measurable and honest, not a clinical claim.
+
+Mapping: five **continuous** axes (O, C, E, A, N in [0,1]) → behavioral tendencies, register/voice
+(from the materials if the persona is "after" a corpus), values, mannerisms, an own "history" in
+memory. If a discrete seed is needed for generative convenience, we **bucket the continuous scores
+into our own archetypes with our own names and descriptions** (the `archetype` field, optional) —
+never anyone else's names or text. See `schemas/persona_blueprint.schema.json` (`ocean` instead of
+the old `lattice`).
+
+---
+
+## 12. Build phases (each with an eval gate)
+
+- **Phase 0 — skeleton.** Workspace bootstrap, config, backend adapter (llama.cpp + openai),
+  contract abstraction, a "hello world" turn loop end-to-end on *empty* content. (First make it work
+  end-to-end on empty, then add pieces.)
+- **Phase 1 — ingest + RAG.** Add books → chunk → embed → retrieve. Gate: retrieval relevance on
+  manual queries.
+- **Phase 2 — worldbuilding (the founding idea).** World DISTILL (corpus → world blueprint) +
+  worldbuilding PLAY loop + STATE + fact ledger. TUI client. First playable world: **Kipple** (PKD).
+- **Phase 3 — eval rig.** style-fidelity, drift, commit-rate; ablate prompt/RAG choices. Gate:
+  drift under control across a long session.
+- **Phase 4 — persona.** Persona DISTILL (OCEAN/IPIP substrate × material → persona blueprint) +
+  persona PLAY loop (conversation, consistency).
+- **Phase 5 — web UI.** A thin client over the core (FastAPI). Adding books through the web.
+- **Phase 6 — persona-in-world.** The uniform entity model pays off: a persona as a rich NPC. Only
+  once Phase 3 shows controlled drift for a single entity.
+
+The rule across all phases: add a component only when ablation shows a delta or prevents a
+regression. The thinnest harness that works, then growth by proof — the inverse of "970/1000 of
+machinery richness."
+
+---
+
+## 13. Explicit non-goals (anti-inflation)
+
+- No large world ontology in the prompt (pointers + spine instead).
+- No rigid multi-step reasoning templates in the system prompt (rigidity hurts — see dim_masina in
+  `PRINCIPLES.md`).
+- No self-modifying "super-exo" layer in v1 (defeasible heuristics later, if ablation asks).
+- No LangChain or heavy abstractions — direct calls.
+- No Z-machine/Zork fork — the wrong foundation for corpus→world.

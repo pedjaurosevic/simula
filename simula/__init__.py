@@ -1,7 +1,7 @@
-"""simula — lokalno-prvi pogon za sazdavanje i naseljavanje svetova i persona iz korisnikovih
-materijala. Vidi PLAN.md i PRINCIPLES.md.
+"""simula — a local-first engine for generating and inhabiting worlds and personas from the
+user's own materials. See PLAN.md and PRINCIPLES.md.
 
-Jedan engine, dva tipa blueprinta (world | persona), jedinstven model entiteta (Simulacrum).
+One engine, two blueprint types (world | persona), one unified entity model (Simulacrum).
 """
 from .backends import Backend, Contract, Message, from_config
 from .loop import Simulacrum, TurnResult, run_turn

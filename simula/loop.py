@@ -33,9 +33,9 @@ class TurnResult:
 
 
 COMMIT_DIRECTIVE = (
-    "Obavezi se na konkretan, opipljiv detalj ukorenjen u teksturi ovog sveta/persone. "
-    "Nikad ne uzmичi u genericku fantastiku ili neodredjenost. Ako radnja nije izvodljiva, "
-    "reci zasto, konkretno."
+    "Commit to a concrete, tangible detail rooted in the texture of this world/persona. "
+    "Never retreat into generic fantasy or vagueness. If an action is not feasible, say why, "
+    "concretely."
 )  # The single highest-value prompt content (PRINCIPLES.md #1).
 
 
