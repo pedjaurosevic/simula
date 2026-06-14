@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simula"
-version = "0.1.0"
-description = "Lokalno-prvi pogon za sazdavanje i naseljavanje svetova i persona iz korisnikovih materijala."
+version = "0.1.1"
+description = "A local-first engine for generating and inhabiting worlds and personas from your own materials."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

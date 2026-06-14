@@ -12,4 +12,4 @@ __all__ = [
     "Simulacrum", "TurnResult", "run_turn",
     "bootstrap_workspace", "default_workspace",
 ]
-__version__ = "0.1.0"
+__version__ = "0.1.1"
