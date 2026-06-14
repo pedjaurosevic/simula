@@ -1,0 +1,44 @@
+# simula.toml.example
+# Copy to your workspace as simula.toml and edit.
+# Local-first, but always able to run against any OpenAI-compatible endpoint.
+
+[backend]
+# "llamacpp" (default, local) | "openai_compat"
+kind = "llamacpp"
+
+[backend.llamacpp]
+endpoint = "http://127.0.0.1:18083"
+# llama.cpp serves an OpenAI-compatible /v1/chat/completions AND native /completion.
+# Native /completion is preferred because it accepts a GBNF `grammar` for hard-constrained output.
+model = "gemma-4-12b-it"          # alias only; the loaded GGUF is what matters
+prefer_native_grammar = true
+
+[backend.openai_compat]
+# Used when backend.kind = "openai_compat". Works with OpenAI, or any compatible server.
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"    # read from environment, never store the key here
+model = "gpt-4o-mini"
+# Structured output strategy for this backend: "json_schema" | "tools" | "repair"
+structured_output = "json_schema"
+
+[embeddings]
+# Embeddings stay local by default to avoid coupling, even in openai_compat mode.
+kind = "local_e5"                  # intfloat/multilingual-e5-small
+# kind = "openai_compat"           # alternatively, use the remote endpoint above
+
+[generation]
+temperature = 0.2                  # low for consistency; tune via eval rig
+max_tokens = 800
+
+[experience]
+# "world" | "persona"
+mode = "world"
+blueprint = "blueprints/kipple.world.json"
+
+[rag]
+top_k = 6
+hybrid = true                      # sqlite-vec (dense) + FTS5 (lexical)
+
+[workspace]
+# Leave empty to use the platform default (~/simulacra-workspace via platformdirs).
+path = ""

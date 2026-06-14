@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include PLAN.md
+include PRINCIPLES.md
+include simula.toml.example
+recursive-include schemas *.json
+recursive-include grammars *.gbnf
+include simula/py.typed

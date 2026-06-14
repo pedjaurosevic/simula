@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TurnOutput",
+  "description": "What the LLM must emit each turn. The engine owns truth; the model only PROPOSES deltas. Validated and applied by the engine, never trusted blindly.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["narration", "deltas"],
+  "properties": {
+    "narration": {
+      "type": "string",
+      "description": "Prose shown to the player. Must be concrete and grounded in blueprint texture; never generic mush (see commit-directive)."
+    },
+    "deltas": {
+      "type": "array",
+      "description": "Proposed state changes. Empty array is valid (pure description / refused action).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "target"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": ["set", "add", "remove", "move", "flag", "fact"],
+            "description": "set: set a state field; add/remove: inventory or set membership; move: relocate entity; flag: boolean world flag; fact: append an established fact to the ledger."
+          },
+          "target": {
+            "type": "string",
+            "description": "Dotted path or entity id the op applies to, e.g. 'player.location', 'inventory', 'npc.rachel.mood'."
+          },
+          "value": {
+            "description": "New value / item / fact text. Type depends on op.",
+            "type": ["string", "number", "boolean", "null"]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional short justification, grounded in retrieved material or ledger. Used by the engine for validation/audit."
+          }
+        }
+      }
+    }
+  }
+}

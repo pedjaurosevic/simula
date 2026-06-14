@@ -1,0 +1,31 @@
+# turn_output.gbnf
+# Hard-constrains llama.cpp output to a valid TurnOutput JSON object (see schemas/turn_output.schema.json).
+# Pass via the `grammar` field of llama.cpp's native /completion endpoint.
+# This is the reliability backbone on the local backend: valid structure is GUARANTEED at decode time,
+# not hoped for. (PRINCIPLES.md #4)
+
+root   ::= obj
+obj    ::= "{" ws "\"narration\"" ws ":" ws string ws "," ws "\"deltas\"" ws ":" ws deltas ws "}"
+
+deltas ::= "[" ws ( delta ( ws "," ws delta )* )? ws "]"
+delta  ::= "{" ws
+             "\"op\"" ws ":" ws op ws "," ws
+             "\"target\"" ws ":" ws string
+             ( ws "," ws "\"value\"" ws ":" ws value )?
+             ( ws "," ws "\"reason\"" ws ":" ws string )?
+           ws "}"
+
+op     ::= "\"set\"" | "\"add\"" | "\"remove\"" | "\"move\"" | "\"flag\"" | "\"fact\""
+
+value  ::= string | number | "true" | "false" | "null"
+
+string ::= "\"" char* "\""
+char   ::= [^"\\] | "\\" ( ["\\/bfnrt] | "u" hex hex hex hex )
+hex    ::= [0-9a-fA-F]
+
+number ::= "-"? int frac? exp?
+int    ::= "0" | [1-9] [0-9]*
+frac   ::= "." [0-9]+
+exp    ::= ("e" | "E") ("+" | "-")? [0-9]+
+
+ws     ::= [ \t\n\r]*
