@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from simula import rag
+from simula.backends import LlamaCppBackend, OpenAICompatBackend
+from simula.config import make_embedder
 
 
 class FakeEmbedBackend:
@@ -62,6 +64,26 @@ def test_lexical_only_fallback_when_no_embeddings(tmp_path):
     assert any("kipple" in h.lower() for h in hits)
 
 
+def test_fts_query_drops_stopwords_and_short_tokens():
+    # Only content terms survive; stopwords ("a", "the") and single chars are dropped.
+    assert rag._fts_query("a machine fixing timepieces") == '"machine" OR "fixing" OR "timepieces"'
+    # An all-stopword query yields nothing -> lexical leg is skipped, vector handles it.
+    assert rag._fts_query("is it the") == ""
+
+
+def test_stopword_does_not_pollute_lexical_ranking(tmp_path):
+    # Regression (lexical-only to isolate the FTS fix): the distractor shares only the stopword "a"
+    # with the query; the target shares the content word "android". Stopwords must not flip ranking.
+    mats = tmp_path / "materials"
+    mats.mkdir(parents=True)
+    (mats / "android.txt").write_text("An android repairs broken clocks.", encoding="utf-8")
+    (mats / "garden.txt").write_text("A green garden, a slow river, a high wall.", encoding="utf-8")
+    rag.ingest(tmp_path, DeadBackend())  # no embeddings -> pure lexical
+
+    hits = rag.retrieve(tmp_path, "a android", top_k=1)
+    assert hits and "android" in hits[0].lower()
+
+
 def test_reingest_is_idempotent(tmp_path):
     _write_materials(tmp_path)
     rag.ingest(tmp_path, FakeEmbedBackend())
@@ -75,6 +97,20 @@ def test_empty_query_and_empty_index_are_safe(tmp_path):
     _write_materials(tmp_path)
     rag.ingest(tmp_path, FakeEmbedBackend())
     assert rag.retrieve(tmp_path, "   ") == []         # empty query
+
+
+def test_make_embedder_decoupled_from_chat_backend():
+    # Default/local e5 -> a llamacpp backend pointed at the embeddings endpoint, not the chat one.
+    emb = make_embedder({"embeddings": {"kind": "llamacpp", "endpoint": "http://127.0.0.1:8081",
+                                        "model": "e5"}})
+    assert isinstance(emb, LlamaCppBackend)
+    assert emb.endpoint == "http://127.0.0.1:8081"
+    # "local_e5" is accepted as an alias with a sane default endpoint.
+    assert isinstance(make_embedder({"embeddings": {"kind": "local_e5"}}), LlamaCppBackend)
+    # Explicitly disabled -> None (RAG runs lexical-only).
+    assert make_embedder({"embeddings": {"kind": "none"}}) is None
+    # Missing section -> defaults to a local e5 backend (never silently chat-coupled).
+    assert isinstance(make_embedder({}), LlamaCppBackend)
 
 
 def test_make_retriever_matches_run_turn_shape(tmp_path):

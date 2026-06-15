@@ -65,7 +65,7 @@ def _cmd_distill(args) -> int:
 
 
 def _cmd_play(args) -> int:
-    from .config import load_config, make_backend
+    from .config import load_config, make_backend, make_embedder
     from .play import (
         instantiate_persona, instantiate_world, load_state,
         run_persona_session, run_session,
@@ -85,7 +85,8 @@ def _cmd_play(args) -> int:
     blueprint = json.loads(bp_path.read_text(encoding="utf-8"))
 
     try:
-        backend = make_backend(load_config(ws))
+        cfg = load_config(ws)
+        backend = make_backend(cfg)
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -100,8 +101,9 @@ def _cmd_play(args) -> int:
         state = instantiate(blueprint)
 
     # Ground every turn on the materials, if an index exists (run `simula ingest` first).
+    # Embeddings come from the dedicated [embeddings] endpoint, not the chat backend.
     from .rag import library_path, make_retriever
-    retrieve = make_retriever(ws, backend) if library_path(ws).exists() else None
+    retrieve = make_retriever(ws, make_embedder(cfg)) if library_path(ws).exists() else None
     if retrieve is None:
         print("[no RAG index — run `simula ingest` to ground on your materials]", file=sys.stderr)
 
@@ -115,22 +117,29 @@ def _cmd_play(args) -> int:
 
 
 def _cmd_ingest(args) -> int:
-    from .config import load_config, make_backend
+    from .config import load_config, make_embedder
     from .rag import ingest
 
     ws = default_workspace()
     materials = Path(args.materials) if args.materials else None
     try:
-        backend = make_backend(load_config(ws))
+        cfg = load_config(ws)
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    embedder = make_embedder(cfg)
+    if embedder is None:
+        print("[embeddings disabled in simula.toml — indexing lexical-only]", file=sys.stderr)
+
     def progress(done, total):
         print(f"  indexing {done}/{total} chunks...", file=sys.stderr)
 
-    stats = ingest(ws, backend, materials_dir=materials, progress=progress)
-    note = "with embeddings" if stats["embedded"] else "lexical-only (no embedding server reachable)"
+    stats = ingest(ws, embedder, materials_dir=materials, progress=progress)
+    if embedder is not None and not stats["embedded"]:
+        print("warning: embedding endpoint unreachable — fell back to lexical-only. "
+              "Start your e5 server (see [embeddings] in simula.toml).", file=sys.stderr)
+    note = "with embeddings" if stats["embedded"] else "lexical-only"
     print(f"Indexed {stats['chunks']} chunks from {stats['files']} file(s), {note}.")
     return 0
 

@@ -26,6 +26,15 @@ _RRF_K = 60  # reciprocal-rank-fusion constant; 60 is the common default.
 
 _WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
 
+# Common EN + SR function words. They carry no grounding signal but, left in the FTS query, let a
+# chunk rank on a stopword match (e.g. "a", "the") and pollute the lexical leg of the hybrid.
+_STOPWORDS = frozenset("""
+a an the and or of to in on at is are am was were be been being it its this that these those for
+with as by from has have had do does did not no nor so but if then than there here
+i u o na se je su da li ne ni ali pa te za od do iz sa ka po kao sto što koji koja koje a ja ti on
+ona ono mi vi oni su bi bih ce će
+""".split())
+
 
 def library_path(workspace: Path) -> Path:
     return Path(workspace) / "library.sqlite"
@@ -136,8 +145,13 @@ def ingest(
 # --------------------------------------------------------------------------------------------------
 
 def _fts_query(query: str) -> str:
-    """Turn free text into a safe FTS5 OR-query of quoted terms (avoids syntax/operator errors)."""
-    terms = _WORD_RE.findall(query)
+    """Turn free text into a safe FTS5 OR-query of quoted content terms.
+
+    Drops single characters and stopwords (they carry no grounding signal and otherwise let chunks
+    rank on noise), and quotes each term to avoid FTS5 syntax/operator errors. May return "" — then
+    the lexical leg is skipped and retrieval falls back to the vector leg.
+    """
+    terms = [t for t in _WORD_RE.findall(query.lower()) if len(t) > 1 and t not in _STOPWORDS]
     return " OR ".join(f'"{t}"' for t in terms)
 
 

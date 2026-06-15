@@ -29,6 +29,13 @@ api_key_env = "OPENAI_API_KEY"    # read from the environment, never stored here
 model = "gpt-4o-mini"
 structured_output = "json_schema" # "json_schema" | "tools" | "repair"
 
+[embeddings]
+# RAG embeddings stay local by default, decoupled from the chat model. Run a small e5 server:
+#   llama-server -m multilingual-e5-small-f16.gguf --embeddings --pooling mean -ngl 0 --port 8081
+kind = "llamacpp"                 # "llamacpp" (local e5) | "openai_compat" | "none" (lexical-only)
+endpoint = "http://127.0.0.1:8081"
+model = "multilingual-e5-small"
+
 [generation]
 temperature = 0.2
 max_tokens = 800
