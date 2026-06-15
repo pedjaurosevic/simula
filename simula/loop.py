@@ -116,19 +116,35 @@ def build_prompt(sim: Simulacrum, player_input: str, grounding: list, state: dic
 
 
 def _render_spine(sim: Simulacrum) -> str:
-    """Render the blueprint spine compactly. Tolerates an empty blueprint (hello-world)."""
+    """Render the blueprint spine compactly (v1 + v2). Tolerates an empty blueprint (hello-world)."""
     bp = sim.blueprint or {}
     lines = [f"You are running a {sim.kind} simulacrum."]
     for key in ("title", "name"):
         if bp.get(key):
             lines.append(f"{key.capitalize()}: {bp[key]}")
+    genre = bp.get("genre") or {}
+    if isinstance(genre, dict) and genre.get("primary"):
+        lines.append(f"Genre: {genre['primary']}")
+    # Voice (v2) preferred; fall back to v1 tone.
+    voice = bp.get("voice") or {}
     tone = bp.get("tone") or {}
-    if isinstance(tone, dict) and tone.get("summary"):
+    if isinstance(voice, dict) and voice.get("summary"):
+        line = f"Voice: {voice['summary']}"
+        if voice.get("person"):
+            line += f" (narrate in the {voice['person']} person)"
+        lines.append(line)
+        if voice.get("sensory_palette"):
+            lines.append("Sensory palette: " + ", ".join(map(str, voice["sensory_palette"])))
+    elif isinstance(tone, dict) and tone.get("summary"):
         lines.append(f"Tone: {tone['summary']}")
     if bp.get("rules"):
         lines.append("Rules: " + "; ".join(map(str, bp["rules"])))
     if bp.get("lexicon"):
         lines.append("Lexicon: " + ", ".join(map(str, bp["lexicon"])))
+    engine = bp.get("dramatic_engine") or {}
+    if isinstance(engine, dict) and engine.get("situations"):
+        lines.append("Latent dramatic situations (hidden levers, never name them to the player): "
+                     + ", ".join(map(str, engine["situations"])))
     return "\n".join(lines)
 
 

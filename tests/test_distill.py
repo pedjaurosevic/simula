@@ -49,34 +49,46 @@ def test_read_materials_reads_txt_and_md(tmp_path):
 
 def test_reduce_dedups_and_shapes():
     partials = [
-        {"tone": "bleak", "rules": ["entropy wins"], "lexicon": ["kipple", "Kipple"],
-         "places": [{"name": "Apartment", "note": "dusty"}]},
-        {"tone": "bleak", "rules": ["entropy wins", "objects decay"], "lexicon": ["kibble"],
+        {"genre_primary": "Dystopian", "voice": "bleak", "rules": ["entropy wins"],
+         "lexicon": ["kipple", "Kipple"], "dramatic_situations": ["Revolt"],
+         "places": [{"name": "Apartment", "note": "dusty", "exits": ["Hall"]}]},
+        {"genre_primary": "Dystopian", "voice": "bleak", "rules": ["entropy wins", "objects decay"],
+         "lexicon": ["kibble"], "dramatic_situations": ["Revolt", "Pursuit"],
          "places": [{"name": "apartment"}]},
     ]
     bp = reduce_partials(partials, world_id="kipple", title="Kipple")
 
     assert bp["id"] == "kipple" and bp["title"] == "Kipple"
-    assert bp["tone"]["summary"] == "bleak"               # deduped tone
+    assert bp["genre"]["primary"] == "Dystopian"
+    assert bp["voice"]["summary"] == "bleak"               # deduped voice
     assert bp["rules"] == ["entropy wins", "objects decay"]
-    assert bp["lexicon"] == ["kipple", "kibble"]          # case-insensitive dedup
-    assert len(bp["seeds"]["places"]) == 1                # deduped by name
+    assert bp["lexicon"] == ["kipple", "kibble"]           # case-insensitive dedup
+    assert bp["dramatic_engine"]["situations"] == ["Revolt", "Pursuit"]
+    assert bp["stats"]["resilience"]["name"] == "Compliance"  # genre-styled (Dystopian)
+    assert len(bp["seeds"]["places"]) == 1                 # deduped by name
+    assert bp["seeds"]["places"][0]["id"] == "apartment"   # slug id assigned
+    assert bp["seeds"]["places"][0]["exits"] == [{"to": "hall"}]  # exit normalized
+    assert bp["opening"]["location"] == "apartment"
 
 
-def test_distill_world_produces_valid_blueprint(tmp_path):
+def test_distill_world_produces_valid_v2_blueprint(tmp_path):
     (tmp_path / "book.txt").write_text("\n\n".join(f"chapter {i} text" for i in range(5)), encoding="utf-8")
     backend = PartialBackend(
-        {"tone": "entropic, melancholy", "rules": ["reality is unreliable"],
-         "lexicon": ["kipple"], "places": [{"name": "Conapt"}]}
+        {"genre_primary": "Dystopian Sci-Fi", "voice": "entropic, melancholy", "person": "second",
+         "sensory_palette": ["dust"], "rules": ["reality is unreliable"], "lexicon": ["kipple"],
+         "dramatic_situations": ["The Enigma"], "topology": "interconnected-rooms",
+         "places": [{"name": "Conapt", "exits": ["Hall"]}]}
     )
 
     bp = distill_world([tmp_path], backend, world_id="kipple", title="Kipple", window_chars=20)
 
     assert backend.calls >= 1
-    for key in ("id", "title", "tone", "rules", "lexicon", "seeds"):
+    for key in ("id", "title", "genre", "voice", "rules", "lexicon", "stats", "dramatic_engine", "space", "seeds"):
         assert key in bp
+    assert bp["voice"]["person"] == "second"
+    assert bp["space"]["topology"] == "interconnected-rooms"
 
-    # Validate against the real shipped schema.
+    # Validate against the real shipped v2 schema.
     jsonschema = pytest.importorskip("jsonschema")
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     jsonschema.validate(bp, schema)
