@@ -66,10 +66,19 @@ def _cmd_distill(args) -> int:
 
 def _cmd_play(args) -> int:
     from .config import load_config, make_backend
-    from .play import instantiate_world, load_state, run_session
+    from .play import (
+        instantiate_persona, instantiate_world, load_state,
+        run_persona_session, run_session,
+    )
 
     ws = default_workspace()
-    bp_path = Path(args.blueprint) if args.blueprint else (ws / "blueprints" / f"{args.world}.world.json")
+    is_persona = bool(args.persona)
+    if args.blueprint:
+        bp_path = Path(args.blueprint)
+    elif is_persona:
+        bp_path = ws / "blueprints" / f"{args.persona}.persona.json"
+    else:
+        bp_path = ws / "blueprints" / f"{args.world}.world.json"
     if not bp_path.exists():
         print(f"error: no blueprint at {bp_path} — run `simula distill` first", file=sys.stderr)
         return 1
@@ -81,16 +90,21 @@ def _cmd_play(args) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    save_path = Path(args.save) if args.save else (ws / "saves" / f"{blueprint['id']}.save.json")
-    state = None
+    kind = "persona" if is_persona else "world"
+    save_path = Path(args.save) if args.save else (ws / "saves" / f"{blueprint['id']}.{kind}.save.json")
+    instantiate = instantiate_persona if is_persona else instantiate_world
     if save_path.exists() and not args.new:
         state = load_state(save_path)
         print(f"[resuming {save_path} at turn {state.get('turn', 0)}]", file=sys.stderr)
     else:
-        state = instantiate_world(blueprint)
+        state = instantiate(blueprint)
 
-    print("Type your actions. Commands: /look /stats /save /quit", file=sys.stderr)
-    run_session(blueprint, backend, save_path=save_path, state=state)
+    if is_persona:
+        print("Talk to the persona. Commands: /mood /save /quit", file=sys.stderr)
+        run_persona_session(blueprint, backend, save_path=save_path, state=state)
+    else:
+        print("Type your actions. Commands: /look /stats /save /quit", file=sys.stderr)
+        run_session(blueprint, backend, save_path=save_path, state=state)
     return 0
 
 
@@ -119,10 +133,11 @@ def main(argv: list[str] | None = None) -> int:
     p_distill.add_argument("--window", type=int, default=None, help="Map window size in chars.")
     p_distill.add_argument("--source-note", default=None, help="Provenance note (no source text shipped).")
 
-    p_play = sub.add_parser("play", help="Play a world (gameplay runtime).")
+    p_play = sub.add_parser("play", help="Play a world, or talk to a persona (gameplay runtime).")
     p_play.add_argument("--world", help="World id (loads blueprints/<id>.world.json).")
-    p_play.add_argument("--blueprint", default=None, help="Explicit blueprint path (overrides --world).")
-    p_play.add_argument("--save", default=None, help="Save path (default: saves/<id>.save.json).")
+    p_play.add_argument("--persona", help="Persona id (loads blueprints/<id>.persona.json).")
+    p_play.add_argument("--blueprint", default=None, help="Explicit blueprint path (overrides --world/--persona).")
+    p_play.add_argument("--save", default=None, help="Save path (default: saves/<id>.<kind>.save.json).")
     p_play.add_argument("--new", action="store_true", help="Start fresh, ignoring any existing save.")
 
     args = parser.parse_args(argv)
@@ -137,8 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "distill":
         return _cmd_distill(args)
     if args.command == "play":
-        if not args.world and not args.blueprint:
-            print("error: provide --world <id> or --blueprint <path>", file=sys.stderr)
+        if not args.world and not args.persona and not args.blueprint:
+            print("error: provide --world <id>, --persona <id>, or --blueprint <path>", file=sys.stderr)
             return 1
         return _cmd_play(args)
 

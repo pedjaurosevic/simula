@@ -253,3 +253,91 @@ def run_session(
         output_fn(f"[ The story reaches an ending: {state['ending']} ]")
     save_state(state, save_path)
     return state
+
+
+# --------------------------------------------------------------------------------------------------
+# Persona runtime (conversation). A persona is a Simulacrum too, so the loop is the same; only the
+# state shape (mood/disposition/knowledge/goals) and the lack of a map/endings differ.
+# --------------------------------------------------------------------------------------------------
+
+class _PersonaLedger:
+    def __init__(self, state: dict) -> None:
+        self.state = state
+
+    def append(self, delta: dict) -> None:
+        self.state["knowledge"].append({"text": str(delta.get("value", "")), "turn": self.state["turn"]})
+
+    def contradicts(self, delta: dict) -> bool:
+        return False
+
+
+def instantiate_persona(blueprint: dict, *, seed: int | None = None) -> dict:
+    """Build a fresh persona_state from a persona blueprint's opening + goals."""
+    opening = blueprint.get("opening") or {}
+    state: dict[str, Any] = {
+        "persona_id": f"{blueprint['id']}-{int(time.time())}",
+        "blueprint_id": blueprint["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "turn": 0,
+        "mood": {"label": opening["mood"]} if opening.get("mood") else {},
+        "disposition": {},
+        "knowledge": [],
+        "goals": [{"text": str(g), "status": "open"} for g in blueprint.get("goals", []) or []],
+    }
+    if seed is not None:
+        state["seed"] = seed
+    return state
+
+
+def step_persona(state: dict, blueprint: dict, player_input: str, backend: Backend,
+                 *, temperature: float = 0.4, max_tokens: int = 800):
+    """One conversational turn: the persona replies (narration) and the engine applies deltas."""
+    contract = Contract(gbnf_path=GRAMMAR_PATH if GRAMMAR_PATH.exists() else None,
+                        json_schema=_TURN_SCHEMA)
+    sim = Simulacrum(id=state["persona_id"], kind="persona", blueprint=blueprint, state=state)
+    result = run_turn(
+        sim, player_input, backend,
+        retrieve=None, ledger=_PersonaLedger(state), transcript_window=[],
+        contract=contract, temperature=temperature, max_tokens=max_tokens,
+    )
+    state["turn"] += 1
+    return result
+
+
+def run_persona_session(
+    blueprint: dict,
+    backend: Backend,
+    *,
+    save_path: Path,
+    state: dict | None = None,
+    input_fn: Callable[[str], str] = input,
+    output_fn: Callable[[str], None] = print,
+) -> dict:
+    """Interactive conversation. Commands: /save, /mood, /quit. Returns the final persona_state."""
+    state = state if state is not None else instantiate_persona(blueprint)
+    opening = blueprint.get("opening") or {}
+    if state["turn"] == 0 and opening.get("intro"):
+        output_fn(opening["intro"])
+
+    while True:
+        try:
+            raw = input_fn("> ")
+        except EOFError:
+            break
+        cmd = raw.strip()
+        if cmd in ("/quit", "/q"):
+            break
+        if cmd in ("/save", "/s"):
+            save_state(state, save_path)
+            output_fn(f"[saved to {save_path}]")
+            continue
+        if cmd == "/mood":
+            output_fn(state.get("mood", {}).get("label") or "(neutral)")
+            continue
+        if not cmd:
+            continue
+        result = step_persona(state, blueprint, cmd, backend)
+        output_fn(result.narration)
+
+    save_state(state, save_path)
+    return state

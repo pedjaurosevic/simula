@@ -9,9 +9,12 @@ from simula.__main__ import main
 from simula.play import (
     check_endings,
     eval_condition,
+    instantiate_persona,
     instantiate_world,
+    run_persona_session,
     run_session,
     step,
+    step_persona,
 )
 
 BLUEPRINT = {
@@ -134,7 +137,67 @@ def test_run_session_plays_saves_and_ends(tmp_path):
     assert save.exists()                                 # autosaved at end
 
 
+PERSONA = {
+    "id": "elias", "name": "Elias",
+    "ocean": {"openness": 0.7, "conscientiousness": 0.8, "extraversion": 0.3,
+              "agreeableness": 0.35, "neuroticism": 0.6},
+    "voice": {"summary": "terse, dry", "exemplar_refs": []},
+    "values": ["a private code of fairness"],
+    "wants": ["close the case"], "needs": ["to forgive himself"],
+    "wound": "a partner died on his call",
+    "goals": ["find who is paying the witnesses"],
+    "boundaries": ["won't plant evidence"],
+    "opening": {"mood": "wary", "disposition": "guarded", "intro": "He doesn't look up from the file."},
+}
+
+
+def test_instantiate_persona_seeds_state():
+    state = instantiate_persona(PERSONA, seed=7)
+    assert state["blueprint_id"] == "elias"
+    assert state["mood"] == {"label": "wary"}
+    assert state["goals"] == [{"text": "find who is paying the witnesses", "status": "open"}]
+    assert state["knowledge"] == [] and state["disposition"] == {}
+    assert state["seed"] == 7
+
+
+def test_step_persona_applies_mood_and_knowledge():
+    state = instantiate_persona(PERSONA)
+    backend = ScriptedBackend([
+        {"narration": "'Shut the door,' he says.", "deltas": [
+            {"op": "set", "target": "mood.label", "value": "irritated"},
+            {"op": "set", "target": "disposition.player.trust", "value": -0.2},
+            {"op": "fact", "target": "self", "value": "The player smells of rain."},
+        ]},
+    ])
+    result = step_persona(state, PERSONA, "hello", backend)
+
+    assert "Shut the door" in result.narration
+    assert state["turn"] == 1
+    assert state["mood"]["label"] == "irritated"
+    assert state["disposition"]["player"]["trust"] == -0.2
+    assert state["knowledge"] == [{"text": "The player smells of rain.", "turn": 0}]
+
+
+def test_run_persona_session_talks_and_saves(tmp_path):
+    save = tmp_path / "elias.persona.save.json"
+    backend = ScriptedBackend([
+        {"narration": "'You again.'", "deltas": [{"op": "set", "target": "mood.label", "value": "tired"}]},
+    ])
+    outputs: list[str] = []
+    state = run_persona_session(
+        PERSONA, backend, save_path=save, state=instantiate_persona(PERSONA),
+        input_fn=_scripted_input(["hello", "/mood", "/quit"]),
+        output_fn=outputs.append,
+    )
+    joined = "\n".join(outputs)
+    assert "He doesn't look up from the file." in joined  # intro
+    assert "'You again.'" in joined                       # reply
+    assert "tired" in joined                              # /mood after the turn
+    assert state["turn"] == 1 and save.exists()
+
+
 def test_play_cli_errors_without_blueprint(tmp_path, monkeypatch):
     monkeypatch.setenv("SIMULA_WORKSPACE", str(tmp_path / "ws"))
     assert main(["play", "--world", "missing"]) == 1
-    assert main(["play"]) == 1  # neither --world nor --blueprint
+    assert main(["play", "--persona", "missing"]) == 1
+    assert main(["play"]) == 1  # none of --world/--persona/--blueprint

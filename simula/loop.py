@@ -145,6 +145,19 @@ def _render_spine(sim: Simulacrum) -> str:
     if isinstance(engine, dict) and engine.get("situations"):
         lines.append("Latent dramatic situations (hidden levers, never name them to the player): "
                      + ", ".join(map(str, engine["situations"])))
+    if sim.kind == "persona":
+        arche = bp.get("archetype") or {}
+        if isinstance(arche, dict) and arche.get("name"):
+            lines.append(f"Archetype: {arche['name']} — {arche.get('summary', '')}".rstrip(" —"))
+        for key, label in (("values", "Values"), ("wants", "Wants"), ("needs", "Needs"),
+                           ("goals", "Goals"), ("quirks", "Quirks"), ("boundaries", "Will never")):
+            if bp.get(key):
+                lines.append(f"{label}: " + "; ".join(map(str, bp[key])))
+        if bp.get("wound"):
+            lines.append(f"Wound: {bp['wound']}")
+        know = bp.get("knowledge") or {}
+        if isinstance(know, dict) and know.get("epistemic_note"):
+            lines.append(f"Epistemic limit: {know['epistemic_note']}")
     return "\n".join(lines)
 
 
