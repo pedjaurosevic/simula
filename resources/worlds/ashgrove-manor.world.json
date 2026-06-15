@@ -1,0 +1,76 @@
+{
+  "id": "ashgrove-manor",
+  "title": "Ashgrove Manor",
+  "genre": {
+    "primary": "Gothic Horror",
+    "conventions": ["the house as antagonist", "inherited guilt", "dread over gore", "the past will not stay buried"]
+  },
+  "source_note": "Distilled from the user's own materials. Texture only; no source text shipped.",
+  "voice": {
+    "summary": "Hushed, ornate, dread-soaked. Long shadows and longer silences; beauty rotting at the edges.",
+    "person": "first",
+    "sensory_palette": ["damp stone", "candle smoke", "wet wool", "distant weeping", "mildew and roses"],
+    "exemplar_refs": []
+  },
+  "rules": [
+    "The manor remembers; rooms rearrange to suit old wrongs.",
+    "Names spoken aloud after dark are heard by something.",
+    "Salvation requires confession, not escape.",
+    "Epistemic lock: a candle-lit 19th-century estate; no modern knowledge or technology."
+  ],
+  "lexicon": ["the long gallery", "the locked nursery", "the family book", "ash-light", "the covenant"],
+  "stats": {
+    "resilience": { "name": "Sanity", "start": 100, "min": 0, "max": 100 },
+    "progress": { "name": "Influence", "start": 0, "max": 100 },
+    "axes": [
+      { "id": "dread", "name": "Dread", "start": 10, "max": 100 },
+      { "id": "faith", "name": "Faith", "start": 50, "max": 100 },
+      { "id": "guilt", "name": "Inherited Guilt", "start": 30, "max": 100 }
+    ]
+  },
+  "dramatic_engine": {
+    "situations": ["Madness", "Discovery of the Dishonor of a Loved One", "Remorse", "Recovery of a Lost One"],
+    "note": "An old family dishonor surfaces; the heir must face it or be unmade by it. The house pursues confession."
+  },
+  "stakes": {
+    "soft": "a fright, a lost ally, or rising Dread",
+    "hard": "a Sanity break or a wound the manor inflicts; a door that will not reopen",
+    "fatal": "Sanity reaches 0, or the covenant claims the heir",
+    "endings": [
+      { "id": "confession", "when": "axes.guilt <= 10 and progress.Influence >= 70" },
+      { "id": "madness", "when": "resilience.Sanity <= 0" },
+      { "id": "claimed", "when": "axes.dread >= 100 and axes.faith <= 0" }
+    ]
+  },
+  "space": {
+    "topology": "interconnected-rooms",
+    "scale": "a single great manor and its grounds",
+    "traversal": "on foot by candlelight; some doors open only after dark",
+    "regions": [
+      { "name": "The East Wing", "note": "the family's public rooms, kept for show" },
+      { "name": "The Closed Wing", "note": "shut after the scandal; the house's true heart" }
+    ]
+  },
+  "seeds": {
+    "places": [
+      { "id": "long_gallery", "name": "The Long Gallery", "region": "The East Wing", "note": "portraits whose eyes track the wrong person",
+        "exits": [{ "to": "main_stair", "direction": "toward the great staircase" }] },
+      { "id": "main_stair", "name": "The Great Staircase", "region": "The East Wing", "note": "a carpet worn pale by feet that no longer walk",
+        "exits": [{ "to": "long_gallery", "direction": "back to the gallery" }, { "to": "locked_nursery", "direction": "up to the closed wing", "locked": true }] },
+      { "id": "locked_nursery", "name": "The Locked Nursery", "region": "The Closed Wing", "note": "cold even in summer; a cradle that rocks itself",
+        "exits": [{ "to": "main_stair", "direction": "down the servants' stair" }] }
+    ],
+    "factions": [
+      { "name": "The Household", "note": "servants who keep older loyalties than to the living" }
+    ],
+    "archetypes": [
+      { "name": "The Returning Heir", "note": "summoned home by a death and a debt unpaid" },
+      { "name": "The Keeper of the Book", "note": "knows every name the family would forget" }
+    ]
+  },
+  "opening": {
+    "location": "long_gallery",
+    "inventory": ["a tallow candle", "the letter that called you home"],
+    "intro": "The carriage is already gone. Behind the portraits, the house exhales, and a name you have not said in years presses against your teeth."
+  }
+}

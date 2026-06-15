@@ -1,46 +1,105 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "WorldBlueprint",
-  "description": "Distilled spine of a world. Deliberately small: mostly POINTERS into the user's materials plus a tiny summary. Not a big ontology (see PRINCIPLES.md #2).",
+  "description": "v2. The distilled, IMMUTABLE spine of a world: mostly pointers + a tiny spine, not an ontology (PRINCIPLES.md #2). Read-only at play time; the mutable, persistent instance lives in world_state.schema.json. v2 adds genre/voice/stats/dramatic_engine/stakes/space. Everything beyond id+title is optional so v1 blueprints still validate.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "title", "tone", "rules", "lexicon", "seeds"],
+  "required": ["id", "title"],
   "properties": {
     "id": { "type": "string" },
     "title": { "type": "string" },
     "source_note": {
       "type": "string",
-      "description": "Short note on provenance. Engine never ships source text; this references the user's own materials."
+      "description": "Short note on provenance. Engine never ships source text; references the user's own materials."
+    },
+    "genre": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Genre as DATA, not a code branch. Drives register, stat names, and typical conflicts.",
+      "properties": {
+        "primary": { "type": "string", "description": "Free-text genre label, e.g. 'Gothic Horror'." },
+        "secondary": { "type": "array", "items": { "type": "string" } },
+        "conventions": { "type": "array", "items": { "type": "string" }, "description": "Genre conventions in play, e.g. 'the house as antagonist'." }
+      }
     },
     "tone": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["summary", "exemplar_refs"],
+      "description": "v1 field, still accepted. Prefer `voice` in v2.",
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string" },
+        "exemplar_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Prose register the narration must honor each turn (the 'prose guidelines' lever).",
       "properties": {
         "summary": { "type": "string", "description": "1-3 sentences on register/mood." },
-        "exemplar_refs": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "RAG chunk ids that exemplify the tone. POINTERS, not copied text."
-        }
+        "person": { "type": "string", "enum": ["first", "second", "third"], "description": "Narration person." },
+        "sensory_palette": { "type": "array", "items": { "type": "string" }, "description": "Signature sensory cues." },
+        "exemplar_refs": { "type": "array", "items": { "type": "string" }, "description": "RAG chunk ids; POINTERS, not copied text." }
       }
     },
     "rules": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "The world's 'physics'/conventions in a few terse lines (e.g. 'reality is unreliable; objects may be simulacra')."
+      "description": "The world's 'physics'/conventions AND hard constraints (e.g. epistemic lock: no knowledge beyond the epoch). The engine enforces these against drift."
     },
     "lexicon": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Signature vocabulary/coinages (e.g. 'kipple', 'kibble', 'empathy box')."
+      "description": "Signature vocabulary/coinages so output sounds in-world."
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The quality gauges the engine tracks (QBN). Two core gauges get genre-styled names; extra axes as needed.",
+      "properties": {
+        "resilience": { "$ref": "#/$defs/gauge", "description": "Genre-styled HP (Vitality, Sanity, Hull Integrity, ...)." },
+        "progress": { "$ref": "#/$defs/gauge", "description": "Genre-styled XP/advancement (Lore, Awareness, Legend, ...)." },
+        "axes": { "type": "array", "items": { "$ref": "#/$defs/axis" }, "description": "Extra named qualities (Suspicion, Dread, Empathy, ...)." }
+      }
+    },
+    "dramatic_engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hidden conflict levers (Polti's 36). Genre-independent; never shown to the player.",
+      "properties": {
+        "situations": { "type": "array", "items": { "type": "string" }, "description": "Polti situation names in play, e.g. 'Revolt', 'The Enigma'." },
+        "note": { "type": "string", "description": "How the situations manifest in this world." }
+      }
+    },
+    "stakes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Consequence model + EMERGENT end conditions (not a branch tree).",
+      "properties": {
+        "soft": { "type": "string" },
+        "hard": { "type": "string" },
+        "fatal": { "type": "string" },
+        "endings": { "type": "array", "items": { "$ref": "#/$defs/ending" } }
+      }
+    },
+    "space": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Spatial model. SEEDS the map and sets how space works; the full map MATERIALIZES into world_state at play and persists there (stability). Not enumerated here (PRINCIPLES.md #2).",
+      "properties": {
+        "topology": { "type": "string", "description": "How space is organized: e.g. 'interconnected-rooms', 'hub-and-spoke', 'open-wilderness', 'city-districts', 'star-systems', 'dungeon-levels'." },
+        "scale": { "type": "string", "description": "Spatial scale, e.g. 'a single manor', 'a sprawling megacity', 'a star sector'." },
+        "traversal": { "type": "string", "description": "How movement works / its costs, e.g. 'on foot via named exits', 'fast-travel between districts', 'jump drive between systems'." },
+        "regions": { "type": "array", "items": { "$ref": "#/$defs/seed" }, "description": "A few high-level regions as light seeds." }
+      }
     },
     "seeds": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Starting scaffolding: a few places/factions/archetypes as light seeds, each linking to material.",
+      "description": "Light starting scaffolding. A FEW key places/factions/archetypes — the rest materializes at play.",
       "properties": {
-        "places": { "type": "array", "items": { "$ref": "#/$defs/seed" } },
+        "places": { "type": "array", "items": { "$ref": "#/$defs/place" } },
         "factions": { "type": "array", "items": { "$ref": "#/$defs/seed" } },
         "archetypes": { "type": "array", "items": { "$ref": "#/$defs/seed" } }
       }
@@ -50,13 +109,45 @@
       "additionalProperties": false,
       "description": "Initial player state for a new save.",
       "properties": {
-        "location": { "type": "string" },
+        "location": { "type": "string", "description": "Starting place id or name." },
         "inventory": { "type": "array", "items": { "type": "string" } },
         "intro": { "type": "string" }
       }
     }
   },
   "$defs": {
+    "gauge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "start": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "start": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "ending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "when"],
+      "properties": {
+        "id": { "type": "string" },
+        "when": { "type": "string", "description": "A condition over stats/axes/flags that fires this ending, e.g. 'resilience.Sanity <= 0'." }
+      }
+    },
     "seed": {
       "type": "object",
       "additionalProperties": false,
@@ -65,6 +156,30 @@
         "name": { "type": "string" },
         "note": { "type": "string" },
         "material_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" },
+        "region": { "type": "string" },
+        "exits": { "type": "array", "items": { "$ref": "#/$defs/exit" }, "description": "Seeded connections to other places (the map graph). More materialize at play." },
+        "material_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "exit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to"],
+      "properties": {
+        "to": { "type": "string", "description": "Target place id or name." },
+        "direction": { "type": "string", "description": "Optional direction label, e.g. 'north', 'up', 'through the iron door'." },
+        "note": { "type": "string" },
+        "locked": { "type": "boolean" }
       }
     }
   }

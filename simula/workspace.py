@@ -2,8 +2,6 @@
 
 Creates ~/simula-workspace (or platform default) with the standard layout, and never ships
 any corpus: the user supplies their own materials (PLAN.md #9).
-
-SKELETON.
 """
 from __future__ import annotations
 
@@ -11,9 +9,41 @@ from pathlib import Path
 
 LAYOUT = ["materials", "blueprints", "saves", "evals"]
 
+# Embedded so `simula init` works from an installed wheel too. Keep in sync with
+# simula.toml.example at the repo root (which exists for documentation).
+DEFAULT_CONFIG = """\
+# simula.toml — copy created by `simula init`. Edit to taste.
+
+[backend]
+# "llamacpp" (default, local) | "openai_compat"
+kind = "llamacpp"
+
+[backend.llamacpp]
+endpoint = "http://127.0.0.1:18083"
+model = "gemma-4-12b-it"          # alias only; the loaded GGUF is what matters
+prefer_native_grammar = true
+
+[backend.openai_compat]
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"    # read from the environment, never stored here
+model = "gpt-4o-mini"
+structured_output = "json_schema" # "json_schema" | "tools" | "repair"
+
+[generation]
+temperature = 0.2
+max_tokens = 800
+
+[distill]
+window_chars = 80000              # raise for big-context (cloud) backends
+"""
+
 
 def default_workspace() -> Path:
-    """Platform-appropriate workspace path. Falls back to ~/simula-workspace."""
+    """Workspace path. Honors $SIMULA_WORKSPACE, else a platform-appropriate location."""
+    import os
+    override = os.environ.get("SIMULA_WORKSPACE")
+    if override:
+        return Path(override)
     try:
         import platformdirs
         return Path(platformdirs.user_data_dir("simula")) / "workspace"
@@ -29,7 +59,6 @@ def bootstrap_workspace(path: Path | None = None) -> Path:
         (ws / sub).mkdir(exist_ok=True)
     cfg = ws / "simula.toml"
     if not cfg.exists():
-        # Phase 0: copy simula.toml.example into place.
-        pass
+        cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
     # Phase 1: initialize library.sqlite (sqlite-vec + FTS5 tables).
     return ws

@@ -1,0 +1,75 @@
+{
+  "id": "kipple",
+  "title": "Kipple",
+  "genre": {
+    "primary": "Dystopian Sci-Fi",
+    "conventions": ["entropy as antagonist", "unreliable reality", "bureaucratic dread"]
+  },
+  "source_note": "Distilled from the user's own materials. Texture only; no source text shipped.",
+  "voice": {
+    "summary": "Melancholy, deadpan, entropic. Concrete decay over abstraction; small human dignities against a rising tide of junk.",
+    "person": "second",
+    "sensory_palette": ["dust", "static", "fluorescent hum", "synthetic smells", "worn plastic"],
+    "exemplar_refs": []
+  },
+  "rules": [
+    "Objects decay into kipple if untended; entropy always wins locally.",
+    "Reality may be simulated; some objects are simulacra and cannot be trusted.",
+    "Empathy is the scarce currency and the measure of a person.",
+    "Epistemic lock: no knowledge beyond a late-20th-century imagined near future."
+  ],
+  "lexicon": ["kipple", "kibble", "empathy box", "conapt", "mood organ", "andy"],
+  "stats": {
+    "resilience": { "name": "Vitality", "start": 100, "min": 0, "max": 100 },
+    "progress": { "name": "Awareness", "start": 0, "max": 100 },
+    "axes": [
+      { "id": "suspicion", "name": "Suspicion", "start": 0, "max": 100 },
+      { "id": "kipple_level", "name": "Kipple", "start": 10, "max": 100 },
+      { "id": "empathy", "name": "Empathy", "start": 50, "max": 100 }
+    ]
+  },
+  "dramatic_engine": {
+    "situations": ["Revolt", "The Enigma", "Erroneous Judgment", "Pursuit"],
+    "note": "Bureaucratic systems persecute; truth is unstable; the player resists the system or unravels what is real."
+  },
+  "stakes": {
+    "soft": "lose a contact or gain Suspicion; an emotional cost that lingers",
+    "hard": "injury or a reality-break; a major, persistent state shift",
+    "fatal": "Vitality reaches 0, or the player is fully absorbed into the system",
+    "endings": [
+      { "id": "escape", "when": "progress.Awareness >= 80 and not captured" },
+      { "id": "consumed", "when": "axes.kipple_level >= 100" },
+      { "id": "hollowed", "when": "axes.empathy <= 0" }
+    ]
+  },
+  "space": {
+    "topology": "interconnected-rooms",
+    "scale": "a half-abandoned residential block and its civic annex",
+    "traversal": "on foot via named exits; the lift works only sometimes",
+    "regions": [
+      { "name": "The Residential Block", "note": "conapts hollowing out one by one" },
+      { "name": "The Civic Annex", "note": "the Bureau's reach into the block" }
+    ]
+  },
+  "seeds": {
+    "places": [
+      { "id": "conapt", "name": "The Conapt", "region": "The Residential Block", "note": "a decaying apartment; dust as a slow grey tide",
+        "exits": [{ "to": "hallway", "direction": "through the front door" }] },
+      { "id": "hallway", "name": "The Block Hallway", "region": "The Residential Block", "note": "flickering strip-lights; identical doors",
+        "exits": [{ "to": "conapt", "direction": "back inside" }, { "to": "bureau_annex", "direction": "down the stairwell" }] },
+      { "id": "bureau_annex", "name": "The Bureau Annex", "region": "The Civic Annex", "note": "endless counters, mis-stamped forms",
+        "exits": [{ "to": "hallway", "direction": "out the revolving door" }] }
+    ],
+    "factions": [
+      { "name": "The Bureau", "note": "issues unreliable directives no one can appeal" }
+    ],
+    "archetypes": [
+      { "name": "The Bounty Clerk", "note": "a weary functionary who quietly suspects the truth" }
+    ]
+  },
+  "opening": {
+    "location": "conapt",
+    "inventory": ["mood organ dial", "a single eroding photograph"],
+    "intro": "The dust has reached the windowsill again. The mood organ waits for a setting, and somewhere down the hall a door you do not remember opening stands ajar."
+  }
+}
