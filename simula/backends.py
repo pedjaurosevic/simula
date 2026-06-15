@@ -98,16 +98,30 @@ class LlamaCppBackend:
         self.prefer_native_grammar = prefer_native_grammar
 
     def complete(self, messages, *, contract=None, temperature=0.2, max_tokens=800) -> str:
-        use_grammar = (
-            self.prefer_native_grammar
-            and contract is not None
-            and contract.gbnf_path is not None
-        )
-        if use_grammar:
-            grammar = Path(contract.gbnf_path).read_text(encoding="utf-8")
+        json_schema = contract.json_schema if contract is not None else None
+        gbnf_path = contract.gbnf_path if contract is not None else None
+
+        # Preferred: the OpenAI-compatible chat endpoint with response_format json_schema. The server
+        # applies the model's own chat template (so reasoning models behave) and enforces structure.
+        if json_schema is not None:
+            payload = {
+                "model": self.model,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "turn_output", "schema": json_schema, "strict": True},
+                },
+            }
+            resp = _post_json(f"{self.endpoint.rstrip('/')}/v1/chat/completions", payload)
+            return resp["choices"][0]["message"]["content"]
+
+        # No schema but a GBNF grammar: use the native /completion endpoint with a raw prompt.
+        if self.prefer_native_grammar and gbnf_path is not None:
             payload = {
                 "prompt": _render_gemma_prompt(messages),
-                "grammar": grammar,
+                "grammar": Path(gbnf_path).read_text(encoding="utf-8"),
                 "temperature": temperature,
                 "n_predict": max_tokens,
                 "cache_prompt": True,
@@ -115,18 +129,13 @@ class LlamaCppBackend:
             resp = _post_json(f"{self.endpoint.rstrip('/')}/completion", payload)
             return resp["content"]
 
-        # No hard grammar: use the OpenAI-compatible chat endpoint (templating server-side).
+        # Unconstrained: plain chat completion.
         payload = {
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        if contract is not None and contract.json_schema is not None:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {"name": "turn_output", "schema": contract.json_schema},
-            }
         resp = _post_json(f"{self.endpoint.rstrip('/')}/v1/chat/completions", payload)
         return resp["choices"][0]["message"]["content"]
 

@@ -174,7 +174,7 @@ _TURN_SCHEMA: dict = {
     "additionalProperties": False,
     "required": ["narration", "deltas"],
     "properties": {
-        "narration": {"type": "string"},
+        "narration": {"type": "string", "maxLength": 700},
         "deltas": {
             "type": "array",
             "items": {

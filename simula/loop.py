@@ -40,8 +40,16 @@ class TurnResult:
 COMMIT_DIRECTIVE = (
     "Commit to a concrete, tangible detail rooted in the texture of this world/persona. "
     "Never retreat into generic fantasy or vagueness. If an action is not feasible, say why, "
-    "concretely."
+    "concretely. Keep the narration to a few vivid sentences, then stop."
 )  # The single highest-value prompt content (PRINCIPLES.md #1).
+
+DELTA_PROTOCOL = (
+    "Reply as a TurnOutput object: a `narration` string, then a `deltas` list of the state changes "
+    "the action justifies (an empty list is fine). Each delta has `op` in "
+    "[set, add, remove, move, flag, fact] and a dotted `target` such as 'player.location', "
+    "'player.inventory', 'stats.<Name>', or 'flags.<name>'; use op 'fact' to record an established "
+    "truth. Change only what the action actually changes; the engine owns the truth."
+)
 
 
 def run_turn(
@@ -103,7 +111,7 @@ def build_prompt(sim: Simulacrum, player_input: str, grounding: list, state: dic
                  transcript_window: list[Message]) -> list[Message]:
     """Assemble the minimal prompt. Keep it thin: spine + pointers-grounding, not a big ontology
     (PRINCIPLES.md #2)."""
-    parts = [COMMIT_DIRECTIVE, "", _render_spine(sim)]
+    parts = [COMMIT_DIRECTIVE, "", _render_spine(sim), "", DELTA_PROTOCOL]
     if state:
         parts += ["", "Current state:", json.dumps(state, ensure_ascii=False)]
     if grounding:
