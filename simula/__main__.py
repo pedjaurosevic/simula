@@ -144,6 +144,91 @@ def _cmd_ingest(args) -> int:
     return 0
 
 
+def _fmt(value) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+def _print_report(report, label: str = "") -> None:
+    head = f"[{label}] " if label else ""
+    print(f"{head}{report.kind}, {report.turns} turns, grounded={report.grounded}")
+    print(f"  commit-rate     : {_fmt(report.commit_rate)}")
+    print(f"  style-fidelity  : {_fmt(report.style_fidelity)}")
+    print(f"  bookkeeping-drift: {_fmt(report.bookkeeping_drift)}")
+    print(f"  narrative-drift : {_fmt(report.narrative_drift)} (needs a real fact ledger)")
+
+
+def _cmd_eval(args) -> int:
+    import time
+    from datetime import datetime, timezone
+
+    from .config import load_config, make_backend, make_embedder
+    from . import eval as evalmod
+    from .rag import library_path, make_retriever
+
+    ws = default_workspace()
+    is_persona = bool(args.persona)
+    if args.blueprint:
+        bp_path = Path(args.blueprint)
+    elif is_persona:
+        bp_path = ws / "blueprints" / f"{args.persona}.persona.json"
+    else:
+        bp_path = ws / "blueprints" / f"{args.world}.world.json"
+    if not bp_path.exists():
+        print(f"error: no blueprint at {bp_path} — run `simula distill` first", file=sys.stderr)
+        return 1
+    blueprint = json.loads(bp_path.read_text(encoding="utf-8"))
+
+    script_path = Path(args.script)
+    if not script_path.exists():
+        print(f"error: no script at {script_path}", file=sys.stderr)
+        return 1
+    inputs = [ln.strip() for ln in script_path.read_text(encoding="utf-8").splitlines()
+              if ln.strip() and not ln.lstrip().startswith("#")]
+    if not inputs:
+        print("error: the script has no player inputs", file=sys.stderr)
+        return 1
+
+    try:
+        cfg = load_config(ws)
+        backend = make_backend(cfg)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    embedder = make_embedder(cfg)
+    retrieve = make_retriever(ws, embedder) if library_path(ws).exists() else None
+    if retrieve is None:
+        print("[no RAG index — grounding metrics will reflect an ungrounded run; "
+              "run `simula ingest` first]", file=sys.stderr)
+    kind = "persona" if is_persona else "world"
+
+    if args.ablate:
+        result = evalmod.ablate_grounding(blueprint, backend, inputs, kind=kind, retrieve=retrieve,
+                                          workspace=ws, embedder=embedder)
+        _print_report(result["grounded"], "grounded")
+        _print_report(result["ungrounded"], "ungrounded")
+        print("  delta (grounded - ungrounded):")
+        for k, v in result["delta"].items():
+            print(f"    {k}: {_fmt(v)}")
+        out_obj = {
+            "grounded": evalmod.report_to_dict(result["grounded"]),
+            "ungrounded": evalmod.report_to_dict(result["ungrounded"]),
+            "delta": result["delta"],
+        }
+    else:
+        report = evalmod.evaluate(blueprint, backend, inputs, kind=kind, retrieve=retrieve,
+                                  workspace=ws, embedder=embedder)
+        _print_report(report)
+        out_obj = evalmod.report_to_dict(report)
+
+    out_obj["meta"] = {"blueprint": blueprint.get("id"), "kind": kind,
+                       "at": datetime.now(timezone.utc).isoformat(), "turns": len(inputs)}
+    out = Path(args.out) if args.out else (ws / "evals" / f"{blueprint['id']}.{int(time.time())}.eval.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(out_obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Eval written: {out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="simula",
@@ -179,6 +264,14 @@ def main(argv: list[str] | None = None) -> int:
     p_play.add_argument("--save", default=None, help="Save path (default: saves/<id>.<kind>.save.json).")
     p_play.add_argument("--new", action="store_true", help="Start fresh, ignoring any existing save.")
 
+    p_eval = sub.add_parser("eval", help="Run a scripted transcript and measure style/commit/drift.")
+    p_eval.add_argument("--world", help="World id (loads blueprints/<id>.world.json).")
+    p_eval.add_argument("--persona", help="Persona id (loads blueprints/<id>.persona.json).")
+    p_eval.add_argument("--blueprint", default=None, help="Explicit blueprint path (overrides --world/--persona).")
+    p_eval.add_argument("--script", required=True, help="Transcript file: one player input per line ('#' comments).")
+    p_eval.add_argument("--ablate", action="store_true", help="Compare grounded vs ungrounded on the same transcript.")
+    p_eval.add_argument("--out", default=None, help="Output path (default: evals/<id>.<ts>.eval.json).")
+
     args = parser.parse_args(argv)
 
     if args.command == "init":
@@ -197,6 +290,11 @@ def main(argv: list[str] | None = None) -> int:
             print("error: provide --world <id>, --persona <id>, or --blueprint <path>", file=sys.stderr)
             return 1
         return _cmd_play(args)
+    if args.command == "eval":
+        if not args.world and not args.persona and not args.blueprint:
+            print("error: provide --world <id>, --persona <id>, or --blueprint <path>", file=sys.stderr)
+            return 1
+        return _cmd_eval(args)
 
     parser.print_help()
     return 0

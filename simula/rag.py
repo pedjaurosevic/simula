@@ -233,6 +233,21 @@ def retrieve(
         conn.close()
 
 
+def corpus_embeddings(workspace: Path) -> list[list[float]]:
+    """All stored chunk embeddings (for the eval rig's style-fidelity). Empty if none were stored."""
+    conn = connect(workspace)
+    try:
+        rows = conn.execute("SELECT embedding FROM chunks WHERE embedding IS NOT NULL").fetchall()
+        return [_unpack(blob) for (blob,) in rows]
+    finally:
+        conn.close()
+
+
+def cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    """Cosine similarity, exposed for the eval rig."""
+    return _cosine(a, b)
+
+
 def make_retriever(workspace: Path, backend=None) -> Callable[[str, int], list[str]]:
     """Bind a `retrieve(query, top_k)` callable in the shape `run_turn` expects."""
 
