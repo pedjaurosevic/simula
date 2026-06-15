@@ -60,5 +60,5 @@ def bootstrap_workspace(path: Path | None = None) -> Path:
     cfg = ws / "simula.toml"
     if not cfg.exists():
         cfg.write_text(DEFAULT_CONFIG, encoding="utf-8")
-    # Phase 1: initialize library.sqlite (sqlite-vec + FTS5 tables).
+    # library.sqlite (FTS5 + embeddings) is created lazily by `simula ingest` (see rag.py).
     return ws

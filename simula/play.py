@@ -141,14 +141,14 @@ class _Ledger:
 
 
 def step(state: dict, blueprint: dict, player_input: str, backend: Backend,
-         *, temperature: float = 0.2, max_tokens: int = 800):
+         *, retrieve=None, temperature: float = 0.2, max_tokens: int = 800):
     """Run one turn: model proposes, engine applies, then materialize place + check endings."""
     contract = Contract(gbnf_path=GRAMMAR_PATH if GRAMMAR_PATH.exists() else None,
                         json_schema=_TURN_SCHEMA)
     sim = Simulacrum(id=state["world_id"], kind="world", blueprint=blueprint, state=state)
     result = run_turn(
         sim, player_input, backend,
-        retrieve=None, ledger=_Ledger(state), transcript_window=[],
+        retrieve=retrieve, ledger=_Ledger(state), transcript_window=[],
         contract=contract, temperature=temperature, max_tokens=max_tokens,
     )
     state["turn"] += 1
@@ -212,6 +212,7 @@ def run_session(
     *,
     save_path: Path,
     state: dict | None = None,
+    retrieve=None,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
 ) -> dict:
@@ -246,7 +247,7 @@ def run_session(
         if not cmd:
             continue
 
-        result = step(state, blueprint, cmd, backend)
+        result = step(state, blueprint, cmd, backend, retrieve=retrieve)
         output_fn(result.narration)
 
     if state.get("ending"):
@@ -290,14 +291,14 @@ def instantiate_persona(blueprint: dict, *, seed: int | None = None) -> dict:
 
 
 def step_persona(state: dict, blueprint: dict, player_input: str, backend: Backend,
-                 *, temperature: float = 0.4, max_tokens: int = 800):
+                 *, retrieve=None, temperature: float = 0.4, max_tokens: int = 800):
     """One conversational turn: the persona replies (narration) and the engine applies deltas."""
     contract = Contract(gbnf_path=GRAMMAR_PATH if GRAMMAR_PATH.exists() else None,
                         json_schema=_TURN_SCHEMA)
     sim = Simulacrum(id=state["persona_id"], kind="persona", blueprint=blueprint, state=state)
     result = run_turn(
         sim, player_input, backend,
-        retrieve=None, ledger=_PersonaLedger(state), transcript_window=[],
+        retrieve=retrieve, ledger=_PersonaLedger(state), transcript_window=[],
         contract=contract, temperature=temperature, max_tokens=max_tokens,
     )
     state["turn"] += 1
@@ -310,6 +311,7 @@ def run_persona_session(
     *,
     save_path: Path,
     state: dict | None = None,
+    retrieve=None,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
 ) -> dict:
@@ -336,7 +338,7 @@ def run_persona_session(
             continue
         if not cmd:
             continue
-        result = step_persona(state, blueprint, cmd, backend)
+        result = step_persona(state, blueprint, cmd, backend, retrieve=retrieve)
         output_fn(result.narration)
 
     save_state(state, save_path)

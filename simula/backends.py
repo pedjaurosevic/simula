@@ -27,6 +27,15 @@ def _post_json(url: str, payload: dict, *, headers: dict | None = None, timeout:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _embed_openai(url: str, texts: list[str], model: str, *, headers: dict | None = None) -> list[list[float]]:
+    """Embed a batch via an OpenAI-compatible /embeddings endpoint. Returns vectors in input order."""
+    if not texts:
+        return []
+    resp = _post_json(url, {"model": model, "input": texts}, headers=headers)
+    data = sorted(resp["data"], key=lambda d: d.get("index", 0))
+    return [d["embedding"] for d in data]
+
+
 def _render_gemma_prompt(messages: Sequence["Message"]) -> str:
     """Render messages into a Gemma-style chat prompt for llama.cpp's native /completion.
 
@@ -140,8 +149,10 @@ class LlamaCppBackend:
         return resp["choices"][0]["message"]["content"]
 
     def embed(self, texts) -> list[list[float]]:
-        # Phase 1: local e5-small (sentence-transformers) or llama.cpp /embedding.
-        raise NotImplementedError
+        # llama.cpp serves an OpenAI-compatible /v1/embeddings when launched with --embeddings.
+        # Run a dedicated embedding server (e.g. e5-small) and point endpoint at it if the chat
+        # model has no embeddings; the interface is the same either way.
+        return _embed_openai(f"{self.endpoint.rstrip('/')}/v1/embeddings", list(texts), self.model)
 
 
 class OpenAICompatBackend:
@@ -188,7 +199,10 @@ class OpenAICompatBackend:
 
     def embed(self, texts) -> list[list[float]]:
         # Default to local e5 even here (decoupling); only use remote embeddings if configured.
-        raise NotImplementedError
+        return _embed_openai(
+            f"{self.base_url.rstrip('/')}/embeddings", list(texts), self.model,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+        )
 
 
 def from_config(cfg: dict) -> Backend:

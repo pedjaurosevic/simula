@@ -99,12 +99,39 @@ def _cmd_play(args) -> int:
     else:
         state = instantiate(blueprint)
 
+    # Ground every turn on the materials, if an index exists (run `simula ingest` first).
+    from .rag import library_path, make_retriever
+    retrieve = make_retriever(ws, backend) if library_path(ws).exists() else None
+    if retrieve is None:
+        print("[no RAG index — run `simula ingest` to ground on your materials]", file=sys.stderr)
+
     if is_persona:
         print("Talk to the persona. Commands: /mood /save /quit", file=sys.stderr)
-        run_persona_session(blueprint, backend, save_path=save_path, state=state)
+        run_persona_session(blueprint, backend, save_path=save_path, state=state, retrieve=retrieve)
     else:
         print("Type your actions. Commands: /look /stats /save /quit", file=sys.stderr)
-        run_session(blueprint, backend, save_path=save_path, state=state)
+        run_session(blueprint, backend, save_path=save_path, state=state, retrieve=retrieve)
+    return 0
+
+
+def _cmd_ingest(args) -> int:
+    from .config import load_config, make_backend
+    from .rag import ingest
+
+    ws = default_workspace()
+    materials = Path(args.materials) if args.materials else None
+    try:
+        backend = make_backend(load_config(ws))
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    def progress(done, total):
+        print(f"  indexing {done}/{total} chunks...", file=sys.stderr)
+
+    stats = ingest(ws, backend, materials_dir=materials, progress=progress)
+    note = "with embeddings" if stats["embedded"] else "lexical-only (no embedding server reachable)"
+    print(f"Indexed {stats['chunks']} chunks from {stats['files']} file(s), {note}.")
     return 0
 
 
@@ -133,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
     p_distill.add_argument("--window", type=int, default=None, help="Map window size in chars.")
     p_distill.add_argument("--source-note", default=None, help="Provenance note (no source text shipped).")
 
+    p_ingest = sub.add_parser("ingest", help="Index the workspace materials for RAG grounding.")
+    p_ingest.add_argument("materials", nargs="?", default=None, help="Dir to index (default: workspace/materials).")
+
     p_play = sub.add_parser("play", help="Play a world, or talk to a persona (gameplay runtime).")
     p_play.add_argument("--world", help="World id (loads blueprints/<id>.world.json).")
     p_play.add_argument("--persona", help="Persona id (loads blueprints/<id>.persona.json).")
@@ -151,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "distill":
         return _cmd_distill(args)
+    if args.command == "ingest":
+        return _cmd_ingest(args)
     if args.command == "play":
         if not args.world and not args.persona and not args.blueprint:
             print("error: provide --world <id>, --persona <id>, or --blueprint <path>", file=sys.stderr)
